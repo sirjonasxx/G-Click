@@ -1,6 +1,6 @@
 # G-Click
 
-Clickthrough + advanced click recharge
+Clickthrough + advanced click recharger extension for G-Earth
 
 > habbo has, in addition to the normal ratelimit, a second ratelimit system on the clicking mechanism causing the clicking to block off when you click more than 3 times in a row,  you can click like 3 times per 2.5 seconds
 > 
