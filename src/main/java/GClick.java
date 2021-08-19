@@ -2,10 +2,10 @@ import gearth.Main;
 import gearth.extensions.ExtensionForm;
 import gearth.extensions.ExtensionFormLauncher;
 import gearth.extensions.ExtensionInfo;
-import gearth.extensions.extra.tools.PacketInfoSupport;
 import gearth.extensions.parsers.HAction;
 import gearth.extensions.parsers.HEntityUpdate;
 import gearth.protocol.HMessage;
+import gearth.protocol.HPacket;
 import gearth.ui.GEarthController;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
@@ -41,13 +41,6 @@ public class GClick extends ExtensionForm {
     public CheckBox chkAlwaysOnTop;
     public AnchorPane statePane;
 
-    public static void main(String[] args) {
-        ExtensionFormLauncher.trigger(GClick.class, args);
-    }
-
-
-    private PacketInfoSupport packetInfoSupport = null;
-
     private volatile long latestPingTimestamp = -1;
 
     private volatile int ping = 45;
@@ -57,7 +50,6 @@ public class GClick extends ExtensionForm {
     private volatile long latestWalkTimestamp = -1;
 
 
-
     private volatile boolean rechargerEnabled = false;
     private volatile boolean awaitFridge = false;
     private volatile int fridge = -1;
@@ -65,28 +57,11 @@ public class GClick extends ExtensionForm {
     private volatile boolean clickthroughEnabled = false;
 
     @Override
-    public ExtensionForm launchForm(Stage stage) throws Exception {
-        FXMLLoader loader = new FXMLLoader(getClass().getResource("gclick.fxml"));
-        Parent root = loader.load();
-
-        stage.setTitle("G-Click");
-        stage.setScene(new Scene(root));
-        stage.getScene().getStylesheets().add(GEarthController.class.getResource("/gearth/ui/bootstrap3.css").toExternalForm());
-        stage.getIcons().add(new Image(Main.class.getResourceAsStream("G-EarthLogoSmaller.png")));
-
-        stage.setResizable(false);
-
-        return loader.getController();
-    }
-
-    @Override
     protected void initExtension() {
-        packetInfoSupport = new PacketInfoSupport(this);
-
-        packetInfoSupport.intercept(HMessage.Direction.TOSERVER, "LatencyPingRequest", hMessage -> {
+        intercept(HMessage.Direction.TOSERVER, "LatencyPingRequest", hMessage -> {
             latestPingTimestamp = System.currentTimeMillis();
         });
-        packetInfoSupport.intercept(HMessage.Direction.TOCLIENT, "LatencyPingResponse", hMessage -> {
+        intercept(HMessage.Direction.TOCLIENT, "LatencyPingResponse", hMessage -> {
             if (latestPingTimestamp != -1) {
                 int newPing = (int) (System.currentTimeMillis() - latestPingTimestamp) / 2;
                 pingVariation = pingVariation * 0.66 + (Math.abs(ping - newPing)) * 0.34;
@@ -97,18 +72,18 @@ public class GClick extends ExtensionForm {
             }
         });
 
-        packetInfoSupport.intercept(HMessage.Direction.TOCLIENT, "UserUpdate", hMessage -> {
+        intercept(HMessage.Direction.TOCLIENT, "UserUpdate", hMessage -> {
             if (Arrays.stream(HEntityUpdate.parse(hMessage.getPacket()))
                     .anyMatch(hEntityUpdate -> hEntityUpdate.getAction() == HAction.Move) &&
                     System.currentTimeMillis() > latestRoomTick + 400) {
                 latestRoomTick = System.currentTimeMillis() - ping;
             }
         });
-        packetInfoSupport.intercept(HMessage.Direction.TOSERVER, "MoveAvatar", this::onUserWalk);
+        intercept(HMessage.Direction.TOSERVER, "MoveAvatar", this::onUserWalk);
 
-        packetInfoSupport.intercept(HMessage.Direction.TOCLIENT, "RoomReady", hMessage -> reset());
+        intercept(HMessage.Direction.TOCLIENT, "RoomReady", hMessage -> reset());
 
-        packetInfoSupport.intercept(HMessage.Direction.TOSERVER, "UseFurniture", hMessage -> {
+        intercept(HMessage.Direction.TOSERVER, "UseFurniture", hMessage -> {
             if (awaitFridge) {
                 hMessage.setBlocked(true);
                 fridge = hMessage.getPacket().readInteger();
@@ -128,7 +103,7 @@ public class GClick extends ExtensionForm {
             while(true) {
                 Functions.sleep(1550);
                 if (rechargerEnabled) {
-                    packetInfoSupport.sendToServer("UseFurniture", fridge, 0);
+                    sendToServer(new HPacket("UseFurniture", HMessage.Direction.TOSERVER, fridge, 0));
                 }
             }
         }).start();
@@ -199,7 +174,7 @@ public class GClick extends ExtensionForm {
 
     public void clickthroughClick(ActionEvent actionEvent) {
         clickthroughEnabled = chkClickthrough.isSelected();
-        packetInfoSupport.sendToClient("YouArePlayingGame", clickthroughEnabled);
+        sendToClient(new HPacket("YouArePlayingGame", HMessage.Direction.TOCLIENT, clickthroughEnabled));
 
     }
 
